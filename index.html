@@ -623,7 +623,7 @@ function enterApp(u){
   const h=new Date().getHours();
   document.getElementById('hero-greeting').textContent=h<12?'Buenos días,':h<19?'Buenas tardes,':'Buenas noches,';
   buildPicker();
-  document.getElementById('inp-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('inp-date').value=todayStr();
   renderHome();
   renderPrivacy();
   updateAddPrivNote();
@@ -685,13 +685,17 @@ function goView(v){
   if(v==='settings') renderSettings();
 }
 
+// ── DATE FIX ─────────────────────────────────────────────────
+function pld(str){const[y,m,d]=str.split('-').map(Number);return new Date(y,m-1,d);}
+function todayStr(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
+
 // ── HOME ──────────────────────────────────────────────────────
 function renderHome(){
   if(!curUser) return;
   const now=new Date(), allowed=visUsers();
   const isShared=allowed.length>1;
   const mo=expenses.filter(e=>{
-    const d=new Date(e.date);
+    const d=pld(e.date);
     return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()&&allowed.includes(e.user);
   });
   const total=mo.reduce((s,e)=>s+e.amount,0);
@@ -715,7 +719,7 @@ function renderHome(){
         <div class="tx-ico" style="background:${cat.c}22">${cat.e}</div>
         <div class="tx-info">
           <div class="tx-name">${e.desc||e.subcat||e.category}</div>
-          <div class="tx-meta">${e.category}${e.subcat?' · '+e.subcat:''} · ${new Date(e.date).toLocaleDateString('es-CL',{day:'numeric',month:'short'})}</div>
+          <div class="tx-meta">${e.category}${e.subcat?' · '+e.subcat:''} · ${pld(e.date).toLocaleDateString('es-CL',{day:'numeric',month:'short'})}</div>
         </div>
         <div class="tx-right">
           <div class="tx-amount">${fmt(e.amount)}</div>
@@ -800,9 +804,137 @@ function doPhoto(){
     toast('✦ IA completó los datos automáticamente');
   },1400);
 }
+// ── VOICE NLP ────────────────────────────────────────────────
+const VOICE_KEYWORDS = [
+  {words:['supermercado','líder','jumbo','santa','unimarc','tottus'],cat:'Alimentación',sub:'Supermercado (despensa del mes)'},
+  {words:['pan','panadería','lácteo','leche'],cat:'Alimentación',sub:'Pan y lácteos diarios'},
+  {words:['verdura','fruta','feria','vegetal'],cat:'Alimentación',sub:'Frutas y verduras'},
+  {words:['carne','pescado','pollo','carnicería'],cat:'Alimentación',sub:'Carnes y pescados'},
+  {words:['delivery','pedidos','rappi','uber eat'],cat:'Restaurantes',sub:'Delivery (Pedidos Ya, Rappi)'},
+  {words:['restaurant','restorán','almuerzo','cena','comida'],cat:'Restaurantes',sub:'Salida a comer en familia'},
+  {words:['café','once','cafetería'],cat:'Restaurantes',sub:'Café / once fuera'},
+  {words:['bencina','copec','shell','petrobras','combustible'],cat:'Transporte',sub:'Bencina'},
+  {words:['uber','taxi','cabify'],cat:'Transporte',sub:'Taxi / Uber / Cabify'},
+  {words:['metro','bip','micro','bus'],cat:'Transporte',sub:'Metro / Bip'},
+  {words:['farmacia','medicamento','remedio','pastilla'],cat:'Salud',sub:'Medicamentos'},
+  {words:['médico','doctor','consulta','clínica'],cat:'Salud',sub:'Consultas médicas'},
+  {words:['netflix'],cat:'Suscripciones',sub:'Netflix'},
+  {words:['spotify','música'],cat:'Suscripciones',sub:'Spotify / Apple Music'},
+  {words:['disney'],cat:'Suscripciones',sub:'Disney+'},
+  {words:['claude','chatgpt','inteligencia'],cat:'Suscripciones',sub:'Claude / ChatGPT / IA'},
+  {words:['luz','electricidad','enel','cge'],cat:'Hogar',sub:'Electricidad'},
+  {words:['agua','aguas'],cat:'Hogar',sub:'Agua y gas'},
+  {words:['arriendo','dividendo'],cat:'Hogar',sub:'Dividendo / arriendo'},
+  {words:['ropa','falabella','ripley','paris','zara'],cat:'Vestuario',sub:'Ropa Naty'},
+  {words:['zapato','calzado','zapatilla'],cat:'Vestuario',sub:'Calzado (todos)'},
+  {words:['cine','película','pelicula'],cat:'Diversión',sub:'Cine'},
+  {words:['apuesta','betano','fútbol'],cat:'Diversión',sub:'Apuestas (fútbol, Betano)'},
+  {words:['mamá','mama','hermano','apoyo familiar'],cat:'Apoyo familiar',sub:'Otros apoyos ocasionales'},
+  {words:['colegio','mensualidad','matrícula'],cat:'Educación',sub:'Colegio Magdalena (mensualidad)'},
+  {words:['celular','plan','entel','movistar','claro','wom'],cat:'Tecnología',sub:'Plan celular Naty'},
+];
+
+function parseVoiceText(text){
+  const lower=text.toLowerCase();
+  // extract amount: look for numbers, "mil" keyword, etc.
+  let amount=null;
+  // match patterns like "20 mil", "veinte mil", "20000", "$20.000"
+  const numWords={'cero':0,'un':1,'uno':1,'dos':2,'tres':3,'cuatro':4,'cinco':5,'seis':6,'siete':7,'ocho':8,'nueve':9,'diez':10,'once':11,'doce':12,'trece':13,'catorce':14,'quince':15,'veinte':20,'treinta':30,'cuarenta':40,'cincuenta':50,'sesenta':60,'setenta':70,'ochenta':80,'noventa':90,'cien':100,'ciento':100,'doscientos':200,'trescientos':300,'cuatrocientos':400,'quinientos':500};
+  // try numeric first
+  const numMatch=lower.replace(/[$.]/g,'').match(/(\d[\d\s]*\d|\d)/);
+  if(numMatch){
+    let n=parseInt(numMatch[0].replace(/\s/g,''));
+    if(lower.includes('mil')) n*=1000;
+    amount=n;
+  } else {
+    // try word numbers
+    for(const[word,val] of Object.entries(numWords)){
+      if(lower.includes(word)){
+        let n=val;
+        if(lower.includes('mil')) n*=1000;
+        amount=n; break;
+      }
+    }
+  }
+  // find category
+  let matchedCat=null,matchedSub=null;
+  for(const kw of VOICE_KEYWORDS){
+    if(kw.words.some(w=>lower.includes(w))){matchedCat=kw.cat;matchedSub=kw.sub;break;}
+  }
+  // description: use the raw text cleaned up
+  const desc=text.trim();
+  return {amount,cat:matchedCat,sub:matchedSub,desc};
+}
+
+function applyVoiceResult(result, rawText){
+  const box=document.getElementById('ai-box');
+  let feedback=[];
+  if(result.amount){
+    document.getElementById('inp-amount').value=result.amount;
+    feedback.push('Monto: '+fmt(result.amount));
+  } else {
+    feedback.push('⚠ No detecté monto — ingrésalo manualmente');
+  }
+  if(result.cat){
+    selCat=result.cat; selSub=result.sub;
+    const obj=CATS.find(c=>c.n===result.cat);
+    const d=document.getElementById('sel-cat');
+    d.textContent=obj.e+' '+result.cat+' › '+result.sub; d.style.display='block';
+    feedback.push('Categoría: '+result.cat);
+  } else {
+    feedback.push('⚠ No detecté categoría — selecciónala tú');
+  }
+  document.getElementById('inp-desc').value=rawText;
+  box.innerHTML='<span class="ai-pill">✓ Voz procesada</span> '+feedback.join(' · ');
+  box.style.display='block';
+  toast('✓ Voz procesada — revisa y confirma');
+}
+
+let voiceRecognition=null;
+let voiceActive=false;
+
 function doVoice(){
-  toast('🎤 Grabando nota de voz...');
-  setTimeout(()=>{document.getElementById('inp-desc').value='Nota de voz registrada';toast('✓ Voz procesada — revisa los datos');},2000);
+  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SpeechRecognition){
+    toast('⚠ Tu navegador no soporta voz. Usa Safari en iPhone.');
+    return;
+  }
+  if(voiceActive){
+    if(voiceRecognition) voiceRecognition.stop();
+    return;
+  }
+  const box=document.getElementById('ai-box');
+  voiceRecognition=new SpeechRecognition();
+  voiceRecognition.lang='es-CL';
+  voiceRecognition.continuous=false;
+  voiceRecognition.interimResults=true;
+  voiceRecognition.maxAlternatives=1;
+  voiceActive=true;
+  box.innerHTML='<span class="ai-pill">🎤 Escuchando... habla ahora</span><br><small style="color:var(--green-700);font-size:11px;">Di algo como: "gasté veinte mil en el supermercado"</small>';
+  box.style.display='block';
+  // update cap btn appearance
+  const btn=document.querySelector('.cap-btn:nth-child(2)');
+  if(btn){btn.style.borderColor='var(--red)';btn.style.color='var(--red)';}
+  voiceRecognition.onresult=(e)=>{
+    const transcript=Array.from(e.results).map(r=>r[0].transcript).join('');
+    box.innerHTML='<span class="ai-pill">🎤 Escuchando...</span> '+transcript;
+    if(e.results[0].isFinal){
+      const result=parseVoiceText(transcript);
+      applyVoiceResult(result,transcript);
+    }
+  };
+  voiceRecognition.onerror=(e)=>{
+    voiceActive=false;
+    if(btn){btn.style.borderColor='';btn.style.color='';}
+    if(e.error==='not-allowed') toast('⚠ Activa el micrófono en Configuración → Safari → Micrófono');
+    else toast('⚠ Error de voz: '+e.error);
+    box.style.display='none';
+  };
+  voiceRecognition.onend=()=>{
+    voiceActive=false;
+    if(btn){btn.style.borderColor='';btn.style.color='';}
+  };
+  voiceRecognition.start();
 }
 
 // ── SAVE ──────────────────────────────────────────────────────
@@ -822,7 +954,7 @@ function saveExp(){
   sv('cc_exp2',expenses);
   document.getElementById('inp-amount').value='';
   document.getElementById('inp-desc').value='';
-  document.getElementById('inp-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('inp-date').value=todayStr();
   selCat=null;selSub=null;
   document.getElementById('sel-cat').style.display='none';
   document.getElementById('ai-box').style.display='none';
