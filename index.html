@@ -209,6 +209,25 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Plus J
 .st-btn{background:none;border:1px solid var(--border);border-radius:var(--radius-xs);padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-2);font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:all .15s;}
 .st-btn:active{border-color:var(--accent);color:var(--accent);}
 
+/* VOICE HERO */
+.voice-hero{background:var(--accent);border-radius:var(--radius);padding:28px 20px 22px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;transition:transform .15s,background .15s;user-select:none;}
+.voice-hero:active{transform:scale(.97);background:var(--green-600);}
+.voice-hero.listening{background:var(--green-600);animation:pulse-bg 1.2s ease-in-out infinite;}
+@keyframes pulse-bg{0%,100%{background:var(--green-600);}50%{background:var(--green-500);}}
+.voice-ring{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;color:white;transition:transform .2s;}
+.voice-hero.listening .voice-ring{animation:pulse-ring 1s ease-in-out infinite;}
+@keyframes pulse-ring{0%,100%{transform:scale(1);}50%{transform:scale(1.12);}}
+.voice-label{font-size:18px;font-weight:700;color:white;letter-spacing:-.3px;}
+.voice-hint{font-size:12px;color:rgba(255,255,255,.75);font-weight:500;}
+.voice-examples{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;}
+.voice-examples::-webkit-scrollbar{display:none;}
+.vex-chip{flex-shrink:0;padding:7px 12px;background:var(--green-50);border:1px solid var(--green-200);border-radius:99px;font-size:11px;font-weight:600;color:var(--green-600);cursor:pointer;white-space:nowrap;transition:all .15s;}
+.vex-chip:active{background:var(--green-100);}
+.or-divider{display:flex;align-items:center;gap:10px;color:var(--text-3);font-size:12px;font-weight:600;}
+.or-divider::before,.or-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+.cap-btn-secondary{display:flex;align-items:center;justify-content:center;gap:6px;background:none;border:1.5px dashed var(--border);border-radius:var(--radius-sm);padding:11px;font-size:12px;font-weight:600;color:var(--text-3);font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;width:100%;transition:all .15s;}
+.cap-btn-secondary:active{border-color:var(--accent);color:var(--accent);}
+
 /* TOAST */
 #toast{position:fixed;bottom:95px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--gray-900);color:white;border-radius:99px;padding:9px 18px;font-size:13px;font-weight:500;opacity:0;transition:all .25s;pointer-events:none;white-space:nowrap;z-index:999;}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
@@ -309,6 +328,32 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Plus J
     <!-- ADD -->
     <div class="view" id="v-add">
       <div class="add-wrap">
+
+        <!-- VOICE HERO -->
+        <div class="voice-hero" id="voice-hero" onclick="doVoice()">
+          <div class="voice-ring">
+            <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="32" height="32"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
+          </div>
+          <div class="voice-label" id="voice-label">Toca y habla</div>
+          <div class="voice-hint">Di el monto y en qué gastaste</div>
+        </div>
+
+        <!-- EXAMPLES -->
+        <div class="voice-examples">
+          <div class="vex-chip" onclick="voiceExample(this)">"treinta mil supermercado"</div>
+          <div class="vex-chip" onclick="voiceExample(this)">"bencina cuarenta y cinco mil"</div>
+          <div class="vex-chip" onclick="voiceExample(this)">"veinte mil para mi mamá"</div>
+          <div class="vex-chip" onclick="voiceExample(this)">"farmacia doce mil"</div>
+          <div class="vex-chip" onclick="voiceExample(this)">"netflix quince mil"</div>
+        </div>
+
+        <!-- AI RESULT -->
+        <div class="ai-result-box" id="ai-box" style="display:none;"></div>
+
+        <!-- DIVIDER -->
+        <div class="or-divider"><span>o completa manualmente</span></div>
+
+        <!-- MANUAL FIELDS -->
         <div class="field">
           <div class="lbl">Monto ($)</div>
           <input type="number" class="inp inp-amount" id="inp-amount" placeholder="0" inputmode="numeric">
@@ -323,27 +368,20 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Plus J
           <div class="sel-cat-display" id="sel-cat"></div>
         </div>
         <div class="field">
-          <div class="lbl">Captura (opcional)</div>
-          <div class="capture-row">
-            <button class="cap-btn" onclick="doPhoto()">
-              <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-              Foto boleta
-            </button>
-            <button class="cap-btn" onclick="doVoice()">
-              <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8"/></svg>
-              Nota de voz
-            </button>
-          </div>
-          <input type="file" id="cam-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this)">
-          <div class="ai-result-box" id="ai-box"></div>
-        </div>
-        <div class="field">
           <div class="lbl">Fecha</div>
           <input type="date" class="inp" id="inp-date">
         </div>
+
+        <!-- PHOTO secondary -->
+        <input type="file" id="cam-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this)">
+        <button class="cap-btn-secondary" onclick="doPhoto()">
+          <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" width="16" height="16"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Adjuntar foto de boleta (opcional)
+        </button>
+
         <div class="priv-note">
           <strong id="add-priv-title">Solo tú verás este gasto</strong>
-          <span id="add-priv-text">Para compartirlo con tu familia, activa la vista familiar en Privacidad.</span>
+          <span id="add-priv-text">Para compartirlo activa la vista familiar en Privacidad.</span>
         </div>
         <button class="btn-main" onclick="saveExp()">Guardar gasto</button>
       </div>
@@ -1054,6 +1092,19 @@ function applyVoiceResult(result, rawText){
   toast('✓ Voz procesada — revisa y confirma');
 }
 
+function resetVoiceHero(){
+  const hero=document.getElementById('voice-hero');
+  const lbl=document.getElementById('voice-label');
+  if(hero) hero.classList.remove('listening');
+  if(lbl) lbl.textContent='Toca y habla';
+}
+function voiceExample(el){
+  // simulate voice input from example chip
+  const text = el.textContent.replace(/"/g,'');
+  const result = parseVoiceText(text);
+  applyVoiceResult(result, text);
+  document.getElementById('ai-box').style.display='block';
+}
 let voiceRecognition=null;
 let voiceActive=false;
 
@@ -1074,11 +1125,12 @@ function doVoice(){
   voiceRecognition.interimResults=true;
   voiceRecognition.maxAlternatives=1;
   voiceActive=true;
-  box.innerHTML='<span class="ai-pill">🎤 Escuchando... habla ahora</span><br><small style="color:var(--green-700);font-size:11px;">Di algo como: "gasté veinte mil en el supermercado"</small>';
+  const hero=document.getElementById('voice-hero');
+  const lbl=document.getElementById('voice-label');
+  if(hero) hero.classList.add('listening');
+  if(lbl) lbl.textContent='Escuchando...';
+  box.innerHTML='<span class="ai-pill">🎤 Escuchando... habla ahora</span>';
   box.style.display='block';
-  // update cap btn appearance
-  const btn=document.querySelector('.cap-btn:nth-child(2)');
-  if(btn){btn.style.borderColor='var(--red)';btn.style.color='var(--red)';}
   voiceRecognition.onresult=(e)=>{
     const transcript=Array.from(e.results).map(r=>r[0].transcript).join('');
     box.innerHTML='<span class="ai-pill">🎤 Escuchando...</span> '+transcript;
@@ -1089,14 +1141,14 @@ function doVoice(){
   };
   voiceRecognition.onerror=(e)=>{
     voiceActive=false;
-    if(btn){btn.style.borderColor='';btn.style.color='';}
+    resetVoiceHero();
     if(e.error==='not-allowed') toast('⚠ Activa el micrófono en Configuración → Safari → Micrófono');
     else toast('⚠ Error de voz: '+e.error);
     box.style.display='none';
   };
   voiceRecognition.onend=()=>{
     voiceActive=false;
-    if(btn){btn.style.borderColor='';btn.style.color='';}
+    resetVoiceHero();
   };
   voiceRecognition.start();
 }
