@@ -334,6 +334,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Plus J
               Nota de voz
             </button>
           </div>
+          <input type="file" id="cam-input" accept="image/*" capture="environment" style="display:none" onchange="handlePhoto(this)">
           <div class="ai-result-box" id="ai-box"></div>
         </div>
         <div class="field">
@@ -796,26 +797,106 @@ function updateAddPrivNote(){
 
 // ── CAPTURE SIM ───────────────────────────────────────────────
 function doPhoto(){
-  const box=document.getElementById('ai-box');
-  box.innerHTML='<span class="ai-pill">✦ IA procesando foto...</span>';box.style.display='block';
-  const EX=[
-    {desc:'Supermercado Líder',amount:47200,cat:'Alimentación',sub:'Supermercado (despensa del mes)'},
-    {desc:'Copec bencina',amount:43000,cat:'Transporte',sub:'Bencina'},
-    {desc:'Farmacia Cruz Verde',amount:11900,cat:'Salud',sub:'Medicamentos'},
-    {desc:'Restaurant La Estancia',amount:24000,cat:'Restaurantes',sub:'Salida a comer en familia'},
-    {desc:'Falabella ropa',amount:34990,cat:'Vestuario',sub:'Ropa Naty'},
-  ];
-  const ex=EX[Math.floor(Math.random()*EX.length)];
-  setTimeout(()=>{
-    document.getElementById('inp-amount').value=ex.amount;
-    document.getElementById('inp-desc').value=ex.desc;
-    selCat=ex.cat;selSub=ex.sub;
-    const obj=CATS.find(c=>c.n===ex.cat);
+  document.getElementById('cam-input').click();
+}
+
+function handlePhoto(input){
+  if(!input.files||!input.files[0]) return;
+  const file = input.files[0];
+  const box = document.getElementById('ai-box');
+  box.innerHTML='<span class="ai-pill">📷 Leyendo boleta...</span>';
+  box.style.display='block';
+
+  // Show preview
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    // Use canvas + OCR via browser's native text detection if available
+    const img = new Image();
+    img.onload = function(){
+      // Try native TextDetector (Chrome Android) or fallback to keyword scan
+      if('TextDetector' in window){
+        const td = new TextDetector();
+        createImageBitmap(file).then(bitmap=>{
+          td.detect(bitmap).then(results=>{
+            const text = results.map(r=>r.rawValue).join(' ');
+            processReceiptText(text, ev.target.result);
+          }).catch(()=> processReceiptText('', ev.target.result));
+        });
+      } else {
+        // iOS Safari: use img src and attempt to read via canvas pixel analysis
+        // Fallback: prompt user — show image preview and let voice/manual fill in
+        processReceiptText('', ev.target.result);
+      }
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+  // reset input so same photo can be retaken
+  input.value='';
+}
+
+function processReceiptText(text, imgData){
+  const box = document.getElementById('ai-box');
+  // Show image preview
+  const previewHtml = imgData
+    ? `<img src="${imgData}" style="width:100%;border-radius:8px;margin-bottom:8px;max-height:160px;object-fit:cover;">`
+    : '';
+
+  let amount = null;
+  let matchedCat = null, matchedSub = null, matchedDesc = '';
+
+  if(text){
+    // Try to find total amount — look for "total", "a pagar", biggest number
+    const lines = text.split(/[\n\r]+/);
+    const numPattern = /\$?([\d]{1,3}(?:[.,\s]\d{3})*(?:[.,]\d{2})?)/g;
+    let amounts = [];
+    for(const line of lines){
+      const isTotal = /total|a pagar|pagar|subtotal/i.test(line);
+      const matches = [...line.matchAll(numPattern)];
+      for(const m of matches){
+        const n = parseInt(m[1].replace(/[.,\s]/g,''));
+        if(n > 500) amounts.push({n, isTotal});
+      }
+    }
+    // prefer "total" line, else biggest number
+    const totalLine = amounts.find(a=>a.isTotal);
+    amount = totalLine ? totalLine.n : (amounts.length ? Math.max(...amounts.map(a=>a.n)) : null);
+
+    // match category from text
+    const lower = text.toLowerCase();
+    for(const kw of VOICE_KEYWORDS){
+      if(kw.words.some(w=>lower.includes(w))){
+        matchedCat=kw.cat; matchedSub=kw.sub; break;
+      }
+    }
+    // try to get store name (first meaningful line)
+    matchedDesc = lines.find(l=>l.trim().length>3&&!/^[\d\s$.,]+$/.test(l))||'';
+  }
+
+  // Apply what we found
+  let feedback = [];
+  if(amount){
+    document.getElementById('inp-amount').value = amount;
+    feedback.push('Monto: '+fmt(amount));
+  } else {
+    feedback.push('⚠ No detecté monto — ingrésalo tú');
+  }
+  if(matchedCat){
+    selCat=matchedCat; selSub=matchedSub;
+    const obj=CATS.find(c=>c.n===matchedCat);
     const d=document.getElementById('sel-cat');
-    d.textContent=`${obj.e} ${ex.cat} › ${ex.sub}`;d.style.display='block';
-    box.innerHTML=`<span class="ai-pill">✓ IA completó los datos</span> ${ex.desc} — ${fmt(ex.amount)}`;
-    toast('✦ IA completó los datos automáticamente');
-  },1400);
+    d.textContent=obj.e+' '+matchedCat+' › '+matchedSub; d.style.display='block';
+    feedback.push('Categoría: '+matchedCat);
+  } else {
+    feedback.push('⚠ Selecciona la categoría tú');
+  }
+  if(matchedDesc) document.getElementById('inp-desc').value = matchedDesc;
+
+  const hasData = amount || matchedCat;
+  box.innerHTML = previewHtml +
+    '<span class="ai-pill">'+(hasData?'✓ Boleta leída':'📷 Foto guardada')+'</span> '+
+    feedback.join(' · ')+'<br>'+
+    '<small style="color:var(--green-700);font-size:11px;margin-top:4px;display:block;">Revisa los datos y ajusta si es necesario</small>';
 }
 // ── VOICE NLP ────────────────────────────────────────────────
 const VOICE_KEYWORDS = [
