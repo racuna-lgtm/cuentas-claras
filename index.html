@@ -430,6 +430,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Plus J
   </div>
 </div>
 
+<!-- DELETE MODAL -->
+<div id="del-modal" style="position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;max-width:430px;margin:0 auto;">
+  <div style="background:var(--white);border-radius:20px 20px 0 0;padding:24px 24px 40px;width:100%;">
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px;" id="del-title">Eliminar gasto</div>
+    <div style="font-size:13px;color:var(--text-3);margin-bottom:20px;" id="del-desc"></div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button onclick="confirmDelete()" style="background:var(--red);color:white;border:none;border-radius:var(--radius-sm);padding:15px;font-size:15px;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;">Sí, eliminar</button>
+      <button onclick="closeDelModal()" style="background:none;border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:13px;font-size:14px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;color:var(--text-2);">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- PIN CHANGE MODAL -->
 <div id="pin-modal">
   <div class="pin-modal-inner" style="position:relative;">
@@ -715,7 +727,7 @@ function renderHome(){
     html+=[...filtered].sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,20).map(e=>{
       const cat=CATS.find(c=>c.n===e.category)||CATS[14];
       const u=USERS_DEF[e.user];
-      return `<div class="tx">
+      return `<div class="tx" onclick="openDelModal('${e.id}')">
         <div class="tx-ico" style="background:${cat.c}22">${cat.e}</div>
         <div class="tx-info">
           <div class="tx-name">${e.desc||e.subcat||e.category}</div>
@@ -724,6 +736,7 @@ function renderHome(){
         <div class="tx-right">
           <div class="tx-amount">${fmt(e.amount)}</div>
           ${isShared?`<div class="tx-ubadge" style="background:${u.bg};color:${u.color}">${e.user}</div>`:''}
+          <div style="font-size:10px;color:var(--text-3);margin-top:2px;">toca para borrar</div>
         </div>
       </div>`;
     }).join('');
@@ -1099,6 +1112,36 @@ function clearMyData(){
   toast('✓ Tus gastos fueron eliminados');
   renderSettings(); renderHome();
 }
+
+// ── DELETE ────────────────────────────────────────────────────
+let delTargetId = null;
+function openDelModal(id){
+  const e = expenses.find(x => x.id == id);
+  if(!e) return;
+  // only owner can delete
+  if(e.user !== curUser){ toast('Solo puedes borrar tus propios gastos'); return; }
+  delTargetId = id;
+  document.getElementById('del-title').textContent = e.desc || e.category;
+  document.getElementById('del-desc').textContent = fmt(e.amount) + ' · ' + e.category + (e.subcat?' › '+e.subcat:'') + ' · ' + pld(e.date).toLocaleDateString('es-CL',{day:'numeric',month:'long'});
+  const m = document.getElementById('del-modal');
+  m.style.display='flex';
+}
+function closeDelModal(){
+  document.getElementById('del-modal').style.display='none';
+  delTargetId=null;
+}
+function confirmDelete(){
+  if(!delTargetId) return;
+  expenses = expenses.filter(x => x.id != delTargetId);
+  sv('cc_exp2', expenses);
+  closeDelModal();
+  toast('✓ Gasto eliminado');
+  renderHome();
+}
+// close modal on backdrop tap
+document.getElementById('del-modal').addEventListener('click', function(e){
+  if(e.target === this) closeDelModal();
+});
 
 // ── INIT ──────────────────────────────────────────────────────
 buildUserCards();
