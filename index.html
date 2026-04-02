@@ -675,6 +675,7 @@ function enterApp(u){
   document.getElementById('hero-greeting').textContent=h<12?'Buenos días,':h<19?'Buenas tardes,':'Buenas noches,';
   buildPicker();
   document.getElementById('inp-date').value=todayStr();
+  mMonth=new Date().getMonth(); mYear=new Date().getFullYear();
   renderHome();
   renderPrivacy();
   updateAddPrivNote();
@@ -1198,7 +1199,7 @@ function buildMChips(){
 function renderMetrics(){
   buildMChips();
   const allowed=visUsers();
-  const mo=expenses.filter(e=>{const d=new Date(e.date);return d.getMonth()===mMonth&&d.getFullYear()===mYear&&allowed.includes(e.user);});
+  const mo=expenses.filter(e=>{const d=pld(e.date);return d.getMonth()===mMonth&&d.getFullYear()===mYear&&allowed.includes(e.user);});
   const pad=document.getElementById('mpad');
   if(!mo.length){pad.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-3);font-size:13px;font-weight:500;">Sin datos para ${MONTHS[mMonth]} ${mYear}</div>`;return;}
   const total=mo.reduce((s,e)=>s+e.amount,0);
