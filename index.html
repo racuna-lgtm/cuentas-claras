@@ -901,11 +901,15 @@ function processReceiptText(text, imgData){
     const totalLine = amounts.find(a=>a.isTotal);
     amount = totalLine ? totalLine.n : (amounts.length ? Math.max(...amounts.map(a=>a.n)) : null);
 
-    // match category from text
+    // match category — longest keyword match wins
     const lower = text.toLowerCase();
+    let bestScore2=0;
     for(const kw of VOICE_KEYWORDS){
-      if(kw.words.some(w=>lower.includes(w))){
-        matchedCat=kw.cat; matchedSub=kw.sub; break;
+      for(const w of kw.words){
+        if(lower.includes(w) && w.length>bestScore2){
+          bestScore2=w.length;
+          matchedCat=kw.cat; matchedSub=kw.sub;
+        }
       }
     }
     // try to get store name (first meaningful line)
@@ -948,7 +952,7 @@ const VOICE_KEYWORDS = [
   {words:['carrete','picada','trago','cerveza','vino','pisco','ron','bebidas para','alcohol'],cat:'Alimentación',sub:'Picada y trago para carrete en casa'},
   // RESTAURANTES
   {words:['delivery','pedidos ya','rappi','uber eat','uber eats','domicilio','a domicilio','pidelo','pide'],cat:'Restaurantes',sub:'Delivery (Pedidos Ya, Rappi)'},
-  {words:['restaurant','restoran','restaurante','restorán','cena','cenamos','salimos a comer','fuimos a comer','comida afuera','pizza','sushi','chino','peruano','italiano'],cat:'Restaurantes',sub:'Salida a comer en familia'},
+  {words:['restaurant','restoran','restaurante','restorán','cenamos','salimos a comer','fuimos a comer','comida afuera','pizza','sushi','susheria','chino','peruano','italiano','parrilla','asado afuera'],cat:'Restaurantes',sub:'Salida a comer en familia'},
   {words:['almuerzo','almuerce','almorce','colacion','colación','menú del dia','menu del día','casino'],cat:'Restaurantes',sub:'Almuerzo de trabajo'},
   {words:['cafe','café','cafeteria','cafetería','once','starbucks','juan valdez','te','té','desayuno afuera'],cat:'Restaurantes',sub:'Café / once fuera'},
   {words:['copete','trago afuera','bar','pub','disco','boliche','coctail','cóctel','pinta','chop'],cat:'Restaurantes',sub:'Copete / trago fuera'},
@@ -994,7 +998,7 @@ const VOICE_KEYWORDS = [
   {words:['ropa interior','calzoncillo','calcetines','medias','sostén','brassier'],cat:'Vestuario',sub:'Ropa interior y calcetines'},
   {words:['bolso','cartera','cinturon','cinturón','accesorio','gorro','gorra','bufanda','guantes'],cat:'Vestuario',sub:'Accesorios'},
   // DIVERSIÓN
-  {words:['cine','pelicula','película','cinemark','hoyts','movieland'],cat:'Diversión',sub:'Cine'},
+  {words:['cine','cinemark','hoyts','movieland','entrada al cine','fui al cine','fuimos al cine','pelicula','película','vimos una pelicula','ver pelicula'],cat:'Diversión',sub:'Cine'},
   {words:['salida familiar','paseo','parque','zoo','zoologico','zoológico','museo','excursion','excursión','entradas'],cat:'Diversión',sub:'Salidas familiares (parques, paseos)'},
   {words:['concierto','show','evento','festival','teatro','obra','recital','ticket','entrada concierto'],cat:'Diversión',sub:'Conciertos y eventos'},
   {words:['videojuego','juego','app','aplicacion','aplicación','playstation','xbox','nintendo','steam'],cat:'Diversión',sub:'Juegos y apps de pago'},
@@ -1059,10 +1063,16 @@ function parseVoiceText(text){
       }
     }
   }
-  // find category
-  let matchedCat=null,matchedSub=null;
+  // find category — longest keyword match wins (more specific beats generic)
+  let matchedCat=null,matchedSub=null,bestScore=0;
   for(const kw of VOICE_KEYWORDS){
-    if(kw.words.some(w=>lower.includes(w))){matchedCat=kw.cat;matchedSub=kw.sub;break;}
+    for(const w of kw.words){
+      if(lower.includes(w) && w.length>bestScore){
+        bestScore=w.length;
+        matchedCat=kw.cat;
+        matchedSub=kw.sub;
+      }
+    }
   }
   // description: use the raw text cleaned up
   const desc=text.trim();
